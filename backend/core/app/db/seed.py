@@ -1,4 +1,4 @@
-"""
+﻿"""
 Seed script — creates realistic demo data for all roles.
 Run with: python -m app.db.seed
 
@@ -92,7 +92,7 @@ def _seed_all(session) -> None:
     # ── Instructors ───────────────────────────────────────────────────
     instructor1 = User(
         id=uuid.uuid4(), email="instructor@bobcourse.edu",
-        hashed_password=_hash("Instructor1234!"), full_name="Dr. Jane Smith",
+        hashed_password=_hash("Instructor1234!"), full_name="Norah",
         role=UserRole.instructor, department_id=dept_cs.id, is_active=True,
     )
     instructor2 = User(
@@ -104,7 +104,7 @@ def _seed_all(session) -> None:
     # ── Students ──────────────────────────────────────────────────────
     student1 = User(
         id=uuid.uuid4(), email="student@bobcourse.edu",
-        hashed_password=_hash("Student1234!"), full_name="Alice Johnson",
+        hashed_password=_hash("Student1234!"), full_name="Yousef",
         role=UserRole.student, department_id=dept_cs.id, is_active=True,
     )
     student2 = User(
@@ -299,3 +299,4 @@ def _add_synthetic_submissions(session, campaign, students, questions, ratings_g
 
 if __name__ == "__main__":
     seed()
+
