@@ -1,0 +1,70 @@
+﻿
+services:
+  # â”€â”€â”€ PostgreSQL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  postgres:
+    image: postgres:16-alpine
+    container_name: bobcourse-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bobcourse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bobcourse}
+      POSTGRES_DB: ${POSTGRES_DB:-bobcourse_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bobcourse} -d ${POSTGRES_DB:-bobcourse_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # â”€â”€â”€ Python Core Service â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  core:
+    build:
+      context: ./backend/core
+      dockerfile: Dockerfile
+    container_name: bobcourse-core
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bobcourse}:${POSTGRES_PASSWORD:-bobcourse}@postgres:5432/${POSTGRES_DB:-bobcourse_db}
+      SECRET_KEY: ${SECRET_KEY:-CHANGE_ME_IN_PRODUCTION}
+      ANALYTICS_SERVICE_URL: http://analytics:8080
+      AI_PROVIDER: ${AI_PROVIDER:-offline}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend/core:/app
+    restart: unless-stopped
+
+  # â”€â”€â”€ Java Analytics Service â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  analytics:
+    build:
+      context: ./backend/analytics
+      dockerfile: Dockerfile
+    container_name: bobcourse-analytics
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  # â”€â”€â”€ React Frontend (production build served by Vite preview) â”€â”€â”€â”€â”€
+  frontend:
+    image: node:20-alpine
+    container_name: bobcourse-frontend
+    working_dir: /app
+    command: sh -c "npm install && npm run build && npm run preview -- --host 0.0.0.0 --port 5173"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+    depends_on:
+      - core
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api/v1}
+
+volumes:
+  postgres_data:
+
