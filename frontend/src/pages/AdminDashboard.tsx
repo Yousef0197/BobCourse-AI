@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Admin Dashboard — full sidebar navigation with all management sections.
  * Sections: Dashboard, Campaigns, Academic Structure, Users, Templates, Analytics, Reports
  */
@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import apiClient from '../lib/apiClient'
 import { clearToken, getCurrentUser } from '../lib/auth'
 import AIInsightsPanel from '../components/AIInsightsPanel'
+import Brand from '../components/Brand'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -78,39 +79,73 @@ export default function AdminDashboard() {
   ]
 
   return (
-    <div style={layout.page}>
-      {/* Sidebar */}
-      <aside style={layout.sidebar}>
-        <div style={layout.sidebarLogo}>
-          <div style={{ fontSize: '1rem', fontWeight: 700, color: '#1f2328' }}>BobCourse-AI</div>
-          <div style={{ fontSize: '0.75rem', color: '#57606a', marginTop: '2px' }}>Admin Console</div>
+    <div className="admin-shell">
+      <aside className="admin-sidebar">
+        <div className="admin-sidebar__brand">
+          <Brand subtitle="Admin Console" />
         </div>
-        <nav style={layout.sidebarNav}>
+
+        <div className="admin-sidebar__label">
+          MANAGEMENT
+        </div>
+
+        <nav className="admin-sidebar__nav">
           {navItems.map((item) => (
             <button
               key={item.id}
+              type="button"
               onClick={() => setSection(item.id)}
-              style={section === item.id ? layout.navItemActive : layout.navItem}
+              className={`admin-nav-item${
+                section === item.id ? ' admin-nav-item--active' : ''
+              }`}
             >
-              <span style={{ marginRight: '0.6rem', fontSize: '1rem' }}>{item.icon}</span>
-              {item.label}
+              <span className="admin-nav-item__icon">
+                {item.icon}
+              </span>
+              <span>{item.label}</span>
             </button>
           ))}
         </nav>
-        <div style={layout.sidebarFooter}>
-          <div style={{ fontSize: '0.8rem', color: '#57606a', marginBottom: '0.5rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</div>
-          <button onClick={handleLogout} style={layout.logoutBtn}>Sign out</button>
+
+        <div className="admin-sidebar__footer">
+          <div className="admin-sidebar__user">
+            <span className="admin-sidebar__role">
+              Administrator
+            </span>
+            <span title={user?.email}>
+              {user?.email}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            className="admin-sidebar__logout"
+            onClick={handleLogout}
+          >
+            Sign out
+          </button>
         </div>
       </aside>
 
-      {/* Main content */}
-      <div style={layout.main}>
-        <header style={layout.header}>
-          <h1 style={layout.pageTitle}>
-            {navItems.find((n) => n.id === section)?.label}
-          </h1>
+      <div className="admin-workspace">
+        <header className="admin-header">
+          <div>
+            <span className="admin-header__eyebrow">
+              ADMIN CONSOLE
+            </span>
+
+            <h1>
+              {navItems.find((item) => item.id === section)?.label}
+            </h1>
+          </div>
+
+          <div className="admin-header__status">
+            <span />
+            System workspace
+          </div>
         </header>
-        <div style={layout.content}>
+
+        <main className="admin-content">
           {section === 'dashboard' && <DashboardSection />}
           {section === 'campaigns' && <CampaignsSection />}
           {section === 'structure' && <AcademicStructureSection />}
@@ -118,7 +153,7 @@ export default function AdminDashboard() {
           {section === 'templates' && <TemplatesSection />}
           {section === 'analytics' && <AnalyticsSection />}
           {section === 'reports' && <ReportsSection />}
-        </div>
+        </main>
       </div>
     </div>
   )
@@ -1255,23 +1290,6 @@ function InfoBox({ type, children }: { type: 'info' | 'warning' | 'error'; child
   )
 }
 
-// ─── Layout styles ────────────────────────────────────────────────────────────
-
-const layout: Record<string, React.CSSProperties> = {
-  page: { display: 'flex', minHeight: '100vh', fontFamily: '-apple-system, "Segoe UI", system-ui, sans-serif', background: '#f7f8fa' },
-  sidebar: { width: '220px', minWidth: '220px', background: '#fff', borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh' },
-  sidebarLogo: { padding: '1.25rem 1rem', borderBottom: '1px solid #e5e7eb' },
-  sidebarNav: { flex: 1, padding: '0.75rem 0.5rem', overflow: 'auto' },
-  navItem: { display: 'flex', alignItems: 'center', width: '100%', padding: '0.5rem 0.75rem', background: 'transparent', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.875rem', color: '#57606a', textAlign: 'left', marginBottom: '2px' },
-  navItemActive: { display: 'flex', alignItems: 'center', width: '100%', padding: '0.5rem 0.75rem', background: '#eff6ff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.875rem', color: '#1e40af', fontWeight: 600, textAlign: 'left', marginBottom: '2px' },
-  sidebarFooter: { padding: '1rem', borderTop: '1px solid #e5e7eb' },
-  logoutBtn: { width: '100%', padding: '0.4rem', background: 'transparent', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', color: '#57606a' },
-  main: { flex: 1, overflow: 'auto' },
-  header: { padding: '1.25rem 2rem', background: '#fff', borderBottom: '1px solid #e5e7eb' },
-  pageTitle: { margin: 0, fontSize: '1.15rem', fontWeight: 600, color: '#1f2328' },
-  content: { padding: '1.5rem 2rem', maxWidth: '1200px' },
-}
-
 // ─── Shared styles ────────────────────────────────────────────────────────────
 
 const s: Record<string, React.CSSProperties> = {
@@ -1298,4 +1316,5 @@ const s: Record<string, React.CSSProperties> = {
   subTab: { padding: '0.35rem 0.9rem', background: 'transparent', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', color: '#57606a' },
   subTabActive: { padding: '0.35rem 0.9rem', background: '#3b82d4', border: '1px solid #3b82d4', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', color: '#fff', fontWeight: 600 },
 }
+
 
