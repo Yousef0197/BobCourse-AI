@@ -1,12 +1,13 @@
 ﻿/**
- * Instructor dashboard â€” assigned courses, evaluation results,
- * threshold enforcement message, AI insights panel.
+ * Instructor dashboard — assigned campaigns, privacy-aware analytics,
+ * response-threshold progress, and AI insights.
  */
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import apiClient from '../lib/apiClient'
 import { clearToken, getCurrentUser } from '../lib/auth'
 import AIInsightsPanel from '../components/AIInsightsPanel'
+import Brand from '../components/Brand'
 
 interface CourseOffering {
   id: string
@@ -24,11 +25,30 @@ interface Campaign {
   min_responses_threshold: number
 }
 
+interface CampaignStats {
+  courseCode?: string
+  courseName?: string
+  overallAverage?: number
+  responseRate?: number
+  totalSubmissions?: number
+  threshold?: number
+  questionStats?: Array<{
+    questionId: string
+    questionText: string
+    average: number
+    distribution: Record<string, number>
+  }>
+}
+
 export default function InstructorDashboard() {
   const navigate = useNavigate()
   const user = getCurrentUser()
 
-  const { data: offerings, isLoading: loadingOfferings } = useQuery<CourseOffering[]>({
+  const {
+    data: offerings,
+    isLoading: loadingOfferings,
+    error: offeringsError,
+  } = useQuery<CourseOffering[]>({
     queryKey: ['course-offerings'],
     queryFn: async () => {
       const resp = await apiClient.get<CourseOffering[]>('/course-offerings')
@@ -36,7 +56,11 @@ export default function InstructorDashboard() {
     },
   })
 
-  const { data: campaigns, isLoading: loadingCampaigns } = useQuery<Campaign[]>({
+  const {
+    data: campaigns,
+    isLoading: loadingCampaigns,
+    error: campaignsError,
+  } = useQuery<Campaign[]>({
     queryKey: ['campaigns'],
     queryFn: async () => {
       const resp = await apiClient.get<Campaign[]>('/evaluation-campaigns')
@@ -49,50 +73,165 @@ export default function InstructorDashboard() {
     navigate('/login')
   }
 
-  // Filter to instructor's own offerings
-  const myOfferings = offerings?.filter((o) => o.instructor_id === user?.userId) ?? []
-  const myCampaigns = campaigns?.filter((c) =>
-    myOfferings.some((o) => o.id === c.course_offering_id)
-  ) ?? []
+  const myOfferings =
+    offerings?.filter((offering) => offering.instructor_id === user?.userId) ?? []
+
+  const myCampaigns =
+    campaigns?.filter((campaign) =>
+      myOfferings.some(
+        (offering) => offering.id === campaign.course_offering_id,
+      ),
+    ) ?? []
+
+  const openCampaigns = myCampaigns.filter(
+    (campaign) => campaign.status === 'open',
+  ).length
+
+  const closedCampaigns = myCampaigns.filter(
+    (campaign) => campaign.status === 'closed',
+  ).length
+
+  const draftCampaigns = myCampaigns.filter(
+    (campaign) => campaign.status === 'draft',
+  ).length
 
   const isLoading = loadingOfferings || loadingCampaigns
+  const hasError = Boolean(offeringsError || campaignsError)
 
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <div>
-          <h1 style={styles.h1}>Instructor Dashboard</h1>
-          <p style={styles.subtitle}>{user?.email}</p>
+    <div className="instructor-page">
+      <header className="instructor-topbar">
+        <Brand compact />
+
+        <div className="instructor-account">
+          <div className="instructor-account__copy">
+            <span className="instructor-account__role">Instructor</span>
+            <span>{user?.email}</span>
+          </div>
+
+          <button
+            type="button"
+            className="bc-btn-secondary"
+            onClick={handleLogout}
+          >
+            Sign out
+          </button>
         </div>
-        <button onClick={handleLogout} style={styles.logoutBtn}>Sign out</button>
       </header>
 
-      <main style={styles.main}>
-        <h2 style={styles.h2}>My Course Evaluations</h2>
+      <main className="instructor-main">
+        <section className="instructor-welcome">
+          <div>
+            <span className="instructor-eyebrow">INSTRUCTOR WORKSPACE</span>
+            <h1>Course evaluation insights</h1>
+            <p>
+              Review privacy-protected evaluation results, response progress,
+              and AI-assisted insights for your assigned courses.
+            </p>
+          </div>
+        </section>
 
-        {isLoading && <p style={styles.muted}>Loadingâ€¦</p>}
+        <section className="instructor-kpis">
+          <article className="instructor-kpi">
+            <span>Assigned offerings</span>
+            <strong>{myOfferings.length}</strong>
+            <small>Your current teaching assignments</small>
+          </article>
 
-        {!isLoading && myCampaigns.length === 0 && (
-          <p style={styles.muted}>No evaluation campaigns found for your courses.</p>
-        )}
+          <article className="instructor-kpi">
+            <span>Open campaigns</span>
+            <strong>{openCampaigns}</strong>
+            <small>Currently collecting responses</small>
+          </article>
 
-        {myCampaigns.map((campaign) => (
-          <CampaignResultCard
-            key={campaign.id}
-            campaign={campaign}
-            userId={user?.userId ?? ''}
-          />
-        ))}
+          <article className="instructor-kpi">
+            <span>Results available</span>
+            <strong>{closedCampaigns}</strong>
+            <small>Closed evaluation campaigns</small>
+          </article>
+
+          <article className="instructor-kpi">
+            <span>Preparing</span>
+            <strong>{draftCampaigns}</strong>
+            <small>Draft campaigns</small>
+          </article>
+        </section>
+
+        <section className="instructor-privacy-note">
+          <div className="instructor-privacy-note__icon" aria-hidden="true">
+            ◈
+          </div>
+
+          <div>
+            <strong>Privacy-protected results</strong>
+            <p>
+              Analytics remain unavailable until each campaign reaches its
+              configured minimum-response threshold.
+            </p>
+          </div>
+        </section>
+
+        <section className="instructor-results">
+          <div className="instructor-section-heading">
+            <div>
+              <span className="instructor-eyebrow">MY EVALUATIONS</span>
+              <h2>Campaign results</h2>
+            </div>
+
+            <span className="instructor-campaign-count">
+              {myCampaigns.length}{' '}
+              {myCampaigns.length === 1 ? 'campaign' : 'campaigns'}
+            </span>
+          </div>
+
+          {isLoading && (
+            <div className="instructor-empty bc-card">
+              <strong>Loading your evaluation campaigns…</strong>
+              <span>Please wait a moment.</span>
+            </div>
+          )}
+
+          {!isLoading && hasError && (
+            <div className="instructor-error bc-card" role="alert">
+              <strong>Unable to load your campaigns</strong>
+              <span>Please refresh the page and try again.</span>
+            </div>
+          )}
+
+          {!isLoading && !hasError && myCampaigns.length === 0 && (
+            <div className="instructor-empty bc-card">
+              <strong>No evaluation campaigns yet</strong>
+              <span>
+                Campaigns linked to your assigned courses will appear here.
+              </span>
+            </div>
+          )}
+
+          {!isLoading &&
+            !hasError &&
+            myCampaigns.map((campaign) => (
+              <CampaignResultCard
+                key={campaign.id}
+                campaign={campaign}
+              />
+            ))}
+        </section>
       </main>
     </div>
   )
 }
 
-function CampaignResultCard({ campaign }: { campaign: Campaign; userId: string }) {
-  const { data: stats, isLoading, error } = useQuery<Record<string, unknown>>({
+function CampaignResultCard({ campaign }: { campaign: Campaign }) {
+  const {
+    data: stats,
+    isLoading,
+    error,
+  } = useQuery<CampaignStats>({
     queryKey: ['campaign-stats', campaign.id],
     queryFn: async () => {
-      const resp = await apiClient.get<Record<string, unknown>>(`/analytics/campaigns/${campaign.id}/stats`)
+      const resp = await apiClient.get<CampaignStats>(
+        `/analytics/campaigns/${campaign.id}/stats`,
+      )
       return resp.data
     },
     enabled: campaign.status === 'closed',
@@ -100,140 +239,218 @@ function CampaignResultCard({ campaign }: { campaign: Campaign; userId: string }
   })
 
   if (campaign.status !== 'closed') {
+    const isOpen = campaign.status === 'open'
+
     return (
-      <div style={cardStyles.card}>
-        <div style={cardStyles.header}>
-          <strong>Campaign {campaign.id.slice(0, 8)}â€¦</strong>
+      <article className="instructor-campaign bc-card">
+        <div className="instructor-campaign__header">
+          <div>
+            <span className="instructor-campaign__id">
+              Campaign {campaign.id.slice(0, 8)}
+            </span>
+            <h3>
+              {isOpen
+                ? 'Evaluation in progress'
+                : 'Evaluation campaign preparing'}
+            </h3>
+          </div>
+
           <StatusBadge status={campaign.status} />
         </div>
-        <p style={cardStyles.muted}>Results will be available once the campaign is closed.</p>
-      </div>
+
+        <div className="instructor-guidance">
+          <strong>
+            {isOpen ? 'What happens next?' : 'Campaign status'}
+          </strong>
+          <p>
+            {isOpen
+              ? 'Student responses are currently being collected. Results become available after the campaign closes and the privacy threshold is satisfied.'
+              : 'This campaign is still in draft status and is not collecting student responses yet.'}
+          </p>
+        </div>
+      </article>
     )
   }
 
-  if (isLoading) return <div style={cardStyles.card}><p style={cardStyles.muted}>Loading resultsâ€¦</p></div>
-
-  // Threshold not met
-  if (stats && 'threshold' in stats) {
+  if (isLoading) {
     return (
-      <div style={cardStyles.card}>
-        <div style={cardStyles.header}>
-          <strong>Campaign {campaign.id.slice(0, 8)}â€¦</strong>
-          <StatusBadge status={campaign.status} />
+      <article className="instructor-campaign bc-card">
+        <div className="instructor-loading">
+          Loading campaign results…
         </div>
-        <div style={cardStyles.thresholdNotice}>
-          Results not yet available
+      </article>
+    )
+  }
+
+  if (stats && typeof stats.threshold === 'number') {
+    const totalSubmissions = stats.totalSubmissions ?? 0
+    const threshold = campaign.min_responses_threshold
+    const progress =
+      threshold > 0
+        ? Math.min(100, Math.round((totalSubmissions / threshold) * 100))
+        : 0
+
+    return (
+      <article className="instructor-campaign bc-card">
+        <div className="instructor-campaign__header">
+          <div>
+            <span className="instructor-campaign__id">
+              Campaign {campaign.id.slice(0, 8)}
+            </span>
+            <h3>Results protected</h3>
+          </div>
+
+          <StatusBadge status="closed" />
+        </div>
+
+        <div className="instructor-threshold">
+          <div className="instructor-threshold__top">
+            <div>
+              <span>Privacy threshold progress</span>
+              <strong>
+                {totalSubmissions} / {threshold} responses
+              </strong>
+            </div>
+
+            <span>{progress}%</span>
+          </div>
+
+          <div
+            className="instructor-threshold__bar"
+            aria-label={`${progress}% of privacy threshold reached`}
+          >
+            <span style={{ width: `${progress}%` }} />
+          </div>
+
           <p>
-            Minimum {campaign.min_responses_threshold} responses required to protect student anonymity.
-            Currently: {stats.totalSubmissions as number} response(s).
+            Results remain hidden until at least {threshold} responses are
+            collected to protect student anonymity.
           </p>
         </div>
-      </div>
+      </article>
     )
   }
 
   if (error) {
     return (
-      <div style={cardStyles.card}>
-        <p style={{ color: '#c0392b', fontSize: '0.875rem' }}>Failed to load analytics.</p>
-      </div>
+      <article className="instructor-campaign bc-card">
+        <div className="instructor-error-inline" role="alert">
+          Failed to load analytics for this campaign.
+        </div>
+      </article>
     )
   }
 
-  const questionStats = (stats?.questionStats as Array<{
-    questionId: string
-    questionText: string
-    average: number
-    distribution: Record<string, number>
-  }>) ?? []
+  const questionStats = stats?.questionStats ?? []
 
   return (
-    <div style={cardStyles.card}>
-      <div style={cardStyles.header}>
-        <strong>{stats?.courseCode as string} â€” {stats?.courseName as string}</strong>
-        <StatusBadge status={campaign.status} />
-      </div>
-      <div style={cardStyles.kpiRow}>
-        <KPI label="Overall Average" value={(stats?.overallAverage as number)?.toFixed(2) ?? 'â€”'} />
-        <KPI label="Response Rate" value={`${stats?.responseRate as number}%`} />
-        <KPI label="Submissions" value={String(stats?.totalSubmissions ?? 'â€”')} />
+    <article className="instructor-campaign bc-card">
+      <div className="instructor-campaign__header">
+        <div>
+          <span className="instructor-campaign__id">
+            CLOSED CAMPAIGN
+          </span>
+
+          <h3>
+            {stats?.courseCode ?? 'Course'} —{' '}
+            {stats?.courseName ?? 'Evaluation results'}
+          </h3>
+        </div>
+
+        <StatusBadge status="closed" />
       </div>
 
-      <h4 style={cardStyles.subhead}>Per-Question Results</h4>
-      <table style={cardStyles.table}>
-        <thead>
-          <tr>
-            <th style={cardStyles.th}>Question</th>
-            <th style={cardStyles.th}>Average</th>
-            <th style={cardStyles.th}>1</th>
-            <th style={cardStyles.th}>2</th>
-            <th style={cardStyles.th}>3</th>
-            <th style={cardStyles.th}>4</th>
-            <th style={cardStyles.th}>5</th>
-          </tr>
-        </thead>
-        <tbody>
-          {questionStats.map((qs) => (
-            <tr key={qs.questionId} style={cardStyles.tr}>
-              <td style={cardStyles.td}>{qs.questionText}</td>
-              <td style={{ ...cardStyles.td, fontWeight: 700 }}>{qs.average.toFixed(2)}</td>
-              {[1, 2, 3, 4, 5].map((r) => (
-                <td key={r} style={cardStyles.td}>{qs.distribution[r] ?? 0}</td>
+      <div className="instructor-result-kpis">
+        <ResultKPI
+          label="Overall average"
+          value={
+            typeof stats?.overallAverage === 'number'
+              ? stats.overallAverage.toFixed(2)
+              : '—'
+          }
+        />
+
+        <ResultKPI
+          label="Response rate"
+          value={
+            typeof stats?.responseRate === 'number'
+              ? `${stats.responseRate}%`
+              : '—'
+          }
+        />
+
+        <ResultKPI
+          label="Submissions"
+          value={String(stats?.totalSubmissions ?? '—')}
+        />
+      </div>
+
+      <div className="instructor-question-block">
+        <div className="instructor-question-heading">
+          <span className="instructor-eyebrow">
+            QUESTION BREAKDOWN
+          </span>
+          <h4>Per-question results</h4>
+        </div>
+
+        <div className="instructor-table-wrap">
+          <table className="instructor-table">
+            <thead>
+              <tr>
+                <th>Question</th>
+                <th>Average</th>
+                <th>1</th>
+                <th>2</th>
+                <th>3</th>
+                <th>4</th>
+                <th>5</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {questionStats.map((question) => (
+                <tr key={question.questionId}>
+                  <td>{question.questionText}</td>
+                  <td>
+                    <strong>{question.average.toFixed(2)}</strong>
+                  </td>
+
+                  {[1, 2, 3, 4, 5].map((rating) => (
+                    <td key={rating}>
+                      {question.distribution[rating] ?? 0}
+                    </td>
+                  ))}
+                </tr>
               ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       <AIInsightsPanel campaignId={campaign.id} />
-    </div>
+    </article>
   )
 }
 
-function KPI({ label, value }: { label: string; value: string }) {
+function ResultKPI({
+  label,
+  value,
+}: {
+  label: string
+  value: string
+}) {
   return (
-    <div style={{ textAlign: 'center' }}>
-      <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1f2328' }}>{value}</div>
-      <div style={{ fontSize: '0.8rem', color: '#57606a' }}>{label}</div>
+    <div className="instructor-result-kpi">
+      <strong>{value}</strong>
+      <span>{label}</span>
     </div>
   )
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, { bg: string; text: string }> = {
-    open: { bg: '#d1fae5', text: '#065f46' },
-    closed: { bg: '#f3f4f6', text: '#6b7280' },
-    draft: { bg: '#fef3c7', text: '#92400e' },
-  }
-  const c = colors[status] ?? { bg: '#f3f4f6', text: '#6b7280' }
   return (
-    <span style={{ padding: '2px 10px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 600, background: c.bg, color: c.text }}>
+    <span className={`instructor-status instructor-status--${status}`}>
       {status}
     </span>
   )
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  page: { fontFamily: '-apple-system, "Segoe UI", system-ui, sans-serif', minHeight: '100vh', background: '#f7f8fa' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem 2rem', background: '#fff', borderBottom: '1px solid #e5e7eb' },
-  h1: { margin: 0, fontSize: '1.25rem', color: '#1f2328' },
-  h2: { margin: '0 0 1rem', fontSize: '1.1rem', color: '#1f2328' },
-  subtitle: { margin: '0.25rem 0 0', fontSize: '0.85rem', color: '#57606a' },
-  main: { padding: '2rem', maxWidth: '1000px', margin: '0 auto' },
-  muted: { color: '#57606a', fontSize: '0.9rem' },
-  logoutBtn: { padding: '0.4rem 1rem', background: 'transparent', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: 'pointer', fontSize: '0.875rem' },
-}
-
-const cardStyles: Record<string, React.CSSProperties> = {
-  card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '1.5rem', marginBottom: '1.5rem' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' },
-  kpiRow: { display: 'flex', gap: '2rem', marginBottom: '1.5rem', padding: '1rem', background: '#f7f8fa', borderRadius: '6px' },
-  subhead: { margin: '0 0 0.75rem', fontSize: '0.9rem', color: '#57606a', textTransform: 'uppercase', letterSpacing: '0.05em' },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: { padding: '0.5rem 0.75rem', textAlign: 'left', background: '#f7f8fa', fontSize: '0.8rem', fontWeight: 600, color: '#57606a', borderBottom: '1px solid #e5e7eb' },
-  tr: { borderBottom: '1px solid #e5e7eb' },
-  td: { padding: '0.5rem 0.75rem', fontSize: '0.875rem', color: '#1f2328' },
-  muted: { color: '#57606a', fontSize: '0.875rem', margin: 0 },
-  thresholdNotice: { background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '6px', padding: '1rem', fontSize: '0.875rem', color: '#92400e' },
-}
-
