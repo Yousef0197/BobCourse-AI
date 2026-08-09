@@ -1,4 +1,4 @@
-﻿# BobCourse-AI — University Course Evaluation System
+# BobCourse-AI — University Course Evaluation System
 
 A full-stack university course evaluation system built with React + TypeScript, Python FastAPI, and Java Spring Boot.
 
@@ -28,6 +28,10 @@ Python FastAPI ← PostgreSQL (exclusive)
 cp .env.example .env
 # Edit .env — set a strong SECRET_KEY
 docker compose up --build
+
+# Initialize database schema and demo data
+docker compose exec core alembic upgrade head
+docker compose exec core python -m app.db.seed
 ```
 
 | Service      | URL                       |
