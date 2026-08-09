@@ -81,3 +81,6 @@ jobs:
 
       - name: Run lint
         run: npm run lint
+
+      - name: Build frontend
+        run: npm run build
